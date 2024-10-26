@@ -235,3 +235,156 @@ fn main() {
         println!("{:#?}", x)
     }
 }
+
+/*
+
+it output something :)
+
+Standard Output
+trying
+raw_sample 0
+raw_sample 2
+raw_sample 4
+raw_sample 8
+raw_sample 16
+raw_sample 32
+raw_sample 64
+raw_sample 128
+raw_sample 256
+raw_sample 512
+raw_sample 1024
+raw_sample 2048
+raw_sample 4096
+raw_sample 8192
+raw_sample 16384
+raw_sample 32768
+raw_sample 65536
+raw_sample 131072
+raw_sample 262144
+raw_sample 524288
+raw_sample 1048576
+raw_sample 2097152
+raw_sample 4194304
+raw_sample 8388608
+raw_sample 16777216
+raw_sample 33554432
+raw_sample 67108864
+raw_sample 134217728
+raw_sample 268435456
+raw_sample 536870912
+raw_sample 1073741824
+raw_sample 2147483648
+raw_sample 4294967296
+raw_sample 8589934592
+raw_sample 17179869184
+raw_sample 34359738368
+raw_sample 68719476736
+raw_sample 137438953472
+raw_sample 274877906944
+raw_sample 549755813888
+raw_sample 1099511627776
+raw_sample 2199023255552
+raw_sample 4398046511104
+raw_sample 8796093022208
+raw_sample 17592186044416
+raw_sample 35184372088832
+raw_sample 70368744177664
+raw_sample 140737488355328
+raw_sample 281474976710656
+raw_sample 562949953421312
+raw_sample 1125899906842624
+raw_sample 2251799813685248
+raw_sample 4503599627370496
+raw_sample 9007199254740992
+raw_sample 18014398509481984
+raw_sample 36028797018963968
+raw_sample 72057594037927936
+raw_sample 144115188075855872
+raw_sample 288230376151711744
+raw_sample 576460752303423488
+raw_sample 1152921504606846976
+raw_sample 2305843009213693952
+raw_sample 4611686018427387904
+cursor_jump 1
+debug
+None
+trying
+raw_sample 1
+raw_sample 3
+raw_sample 5
+raw_sample 9
+raw_sample 17
+raw_sample 33
+raw_sample 65
+raw_sample 129
+raw_sample 257
+cursor_jump 257
+cursor_jump 258
+debug
+Some(
+    34,
+)
+trying
+raw_sample 258
+cursor_jump 259
+debug
+Some(
+    33,
+)
+trying
+raw_sample 259
+cursor_jump 260
+debug
+Some(
+    32,
+)
+trying
+raw_sample 260
+raw_sample 262
+raw_sample 256
+raw_sample 268
+raw_sample 276
+raw_sample 292
+cursor_jump 292
+cursor_jump 293
+debug
+Some(
+    7,
+)
+trying
+raw_sample 293
+cursor_jump 294
+debug
+Some(
+    6,
+)
+trying
+raw_sample 294
+cursor_jump 295
+debug
+Some(
+    5,
+)
+trying
+raw_sample 295
+cursor_jump 296
+debug
+Some(
+    4,
+)
+trying
+raw_sample 296
+cursor_jump 297
+debug
+Some(
+    11,
+)
+trying
+raw_sample 297
+cursor_jump 298
+debug
+Some(
+    10,
+)
+
+*/

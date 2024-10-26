@@ -146,7 +146,7 @@ impl<T: Coverage> Fingers for T {
             .take_while(|x| x <= &Self::LAST_INDEX)
     }
     fn successor(&self) -> Self::Finger {
-        let a = self.successor();
+        let a = self.cursor_index().successor();
         if a > Self::LAST_INDEX {
             T::Index::ZERO
         } else {

@@ -1,9 +1,13 @@
+#![feature(fn_traits)]
+#![feature(unboxed_closures)]
 #![feature(step_trait)]
 #![feature(impl_trait_in_assoc_type)]
 #![feature(associated_type_defaults)]
 
 use std::iter::{ExactSizeIterator, Iterator};
 use std::marker::PhantomData as Ph;
+
+use num::traits::bounds::Bounded;
 
 pub trait AutoFingers {
     type Powers: Iterator<Item = Self>;
@@ -16,22 +20,22 @@ pub trait AutoFingers {
 impl<T> AutoFingers for T
 where
     T: 'static + Clone + From<u16> + std::iter::Step,
+    T: Bounded,
     T: std::ops::Shl<u16, Output = T>,
+    T: std::ops::Shr<u16, Output = T>,
     T: std::ops::BitXor<Output = T>,
     T: std::ops::Add<Output = T>,
 {
     type Powers = impl Iterator<Item = Self>;
     fn powers(&self) -> Self::Powers {
-        (0_u16..8191_u16)
-            .zip(1_u16..8192_u16)
-            .map(|(p, q)| {
+        (1_u16..8191_u16)
+            .map(|p| {
                 let one = || -> T { 1.into() };
                 let a: T = one() << p;
-                let b: T = one() << q;
-                if a < b {
-                    Some(a)
-                } else {
+                if a > T::max_value() >> 1_u16 {
                     None
+                } else {
+                    Some(a)
                 }
             })
             .take_while(|x| x.is_some())
@@ -124,11 +128,13 @@ pub trait Coverage: Sized {
     fn shallow_discover(&mut self) -> Option<Self::Item> {
         let cur = self.cursor_index();
         if let Some(hit) = self.sample(&cur) {
+            self.cursor_jump(&self.successor());
             return Some(hit);
         }
         for idx in self.fingers() {
             if let Some(hit) = self.sample(&idx) {
                 self.cursor_jump(&idx);
+                self.cursor_jump(&self.successor());
                 return Some(hit);
             }
         }
@@ -152,5 +158,80 @@ impl<T: Coverage> Fingers for T {
         } else {
             a
         }
+    }
+}
+
+pub struct SimpleCov<Item, Fgen, Pred> {
+    cursor_index: u64,
+    _marker: Ph<(Item, Fgen, Pred)>,
+}
+
+impl<Fgen, Pred> SimpleCov<u64, Fgen, Pred>
+where
+    Fgen: Default + for<'a> FnOnce(&'a u64) -> u64,
+    Pred: Default + for<'a> FnOnce(&'a u64) -> bool,
+{
+    fn new(fgen: Fgen, pred: Pred) -> Self {
+        Self {
+            cursor_index: 0,
+            _marker: Ph,
+        }
+    }
+}
+
+impl<Fgen, Pred> Coverage for SimpleCov<u64, Fgen, Pred>
+where
+    Fgen: Default + for<'a> FnOnce(&'a u64) -> u64,
+    Pred: Default + for<'a> FnOnce(&'a u64) -> bool,
+{
+    type Item = u64;
+
+    const LAST_INDEX: Self::Index = u64::MAX;
+
+    fn cursor_index(&self) -> Self::Index {
+        self.cursor_index
+    }
+
+    fn cursor_jump(&mut self, idx: &Self::Index) {
+        println!("cursor_jump {:#?}", idx);
+        self.cursor_index = *idx;
+    }
+
+    fn raw_sample(idx: &Self::Index) -> Self::Item {
+        println!("raw_sample {:#?}", idx);
+        Fgen::default()(idx)
+    }
+
+    fn predicate(item: &Self::Item) -> bool {
+        Pred::default()(item)
+    }
+}
+
+fn main() {
+    #[derive(Default)]
+    struct Fgen;
+    impl<'a> FnOnce<(&'a u64,)> for Fgen {
+        type Output = u64;
+        extern "rust-call" fn call_once(self, b: (&'a u64,)) -> Self::Output {
+            *b.0 ^ 0x123
+        }
+    }
+
+    #[derive(Default)]
+    struct Pred;
+    impl<'a> FnOnce<(&'a u64,)> for Pred {
+        type Output = bool;
+        extern "rust-call" fn call_once(self, b: (&'a u64,)) -> Self::Output {
+            *b.0 < 35 || *b.0 % 31 == 0
+        }
+    }
+
+    let mut cov = SimpleCov::new(Fgen, Pred);
+
+    for _ in 0..10 {
+        println!("trying");
+        let x = cov.shallow_discover();
+        println!("debug");
+        println!("{:#?}", x)
     }
 }

@@ -8,13 +8,20 @@ use lazy_static::lazy_static;
 use regex::Regex;
 
 lazy_static! {
-    static ref REPR_FMT_REGEX: Regex = { Regex::new(r"([A-Za-z]+[0-9A-Za-z]*::)Node").unwrap() };
+    static ref REPR_FMT_REGEX_PATH: Regex =
+        Regex::new(r"([A-Za-z]+[0-9A-Za-z]*::)(?<a>[A-Z]+[0-9A-Za-z]*)").unwrap();
+    static ref REPR_FMT_REGEX_CLOSURE: Regex =
+        Regex::new(r"\{\{closure\}\}").unwrap();
 }
 
-pub fn pretty_type<T: ?Sized>() -> std::borrow::Cow<'static, str> {
-    let tstr_large_a = std::any::type_name::<T>();
-    let tstr_a = REPR_FMT_REGEX.replace_all(tstr_large_a, "Node");
-    tstr_a
+pub fn pretty_type<T: ?Sized>() -> String {
+    use quote::ToTokens;
+    use syn;
+    let tstr_long = std::any::type_name::<T>();
+    let tstr1 = REPR_FMT_REGEX_PATH.replace_all(tstr_long, "$a");
+    let tstr2 = REPR_FMT_REGEX_CLOSURE.replace_all(&tstr1, "Closure");
+    let typ = syn::parse_str::<syn::Type>(&tstr2).unwrap();
+    quote::quote!(#typ).to_string()
 }
 
 pub trait Meta<T: ?Sized> {

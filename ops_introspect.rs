@@ -59,34 +59,9 @@ pub mod introspect {
         }
     }
 
-    pub trait Wrap {
-        type Output<Impl> = Ph<Box<Impl>>;
-        fn wrap<Impl>(imp: Impl) -> Self::Output<Impl> {
-            Ph::<Box<Impl>>.promise_default_method_output()
-        }
-    }
-
-    pub struct Direct;
-    impl Wrap for Direct {
-        type Output<Impl> = Impl;
-        fn wrap<Impl>(imp: Impl) -> Self::Output<Impl> {
-            imp
-        }
-    }
-
-    pub struct Phantom;
-    impl Wrap for Phantom {}
-
     pub trait Repr {
         type T;
-        type W: Wrap = Phantom;
         type Unref: Repr = Value<!>;
-    }
-
-    pub type WrapOf<R, Impl> = <<R as Repr>::W as Wrap>::Output<Impl>;
-
-    pub fn wrap<R: Repr, Impl>(imp: Impl) -> WrapOf<R, Impl> {
-        <R::W as Wrap>::wrap(imp)
     }
 
     #[repr(transparent)]
@@ -94,7 +69,6 @@ pub mod introspect {
 
     impl<T> Repr for Value<T> {
         type T = T;
-        type W = Direct;
     }
 
     #[repr(transparent)]
@@ -105,14 +79,13 @@ pub mod introspect {
     }
 
     #[repr(transparent)]
-    pub struct Ref<'a, This: Repr>(pub WrapOf<This, &'a This>);
+    pub struct Ref<'a, This: Repr>(pub &'a This);
 
     impl<'a, This: Repr> Repr for Ref<'a, This> {
         type T = &'a This::T;
-        type W = This::W;
         type Unref = This;
     }
-    
+
     type UnrefT<R> = <<R as Repr>::Unref as Repr>::T;
 
     pub trait IsRef<'a>: Repr {
@@ -126,16 +99,15 @@ pub mod introspect {
     }
 
     pub mod logic {
-        use super::{wrap, Repr, WrapOf};
+        use super::Repr;
 
-        pub struct Not<This: Repr>(pub WrapOf<This, This>);
+        pub struct Not<This: Repr>(pub This);
 
         impl<This: Repr> Repr for Not<This>
         where
             This::T: std::ops::Not,
         {
             type T = <This::T as std::ops::Not>::Output;
-            type W = This::W;
         }
 
         pub trait OpNot: Repr {
@@ -151,25 +123,21 @@ pub mod introspect {
         {
             type Output = impl Repr;
             fn not(self) -> Self::Output {
-                Not::<This>(wrap::<This, This>(self))
+                Not(self)
             }
         }
     }
 
     pub mod partial_eq {
-        use super::{logic::Not, IsRef, PromiseCast, Ref, Repr, WrapOf, UnrefT, wrap};
+        use super::{logic::Not, IsRef, PromiseCast, Ref, Repr, UnrefT};
 
-        pub struct OpEq<'a, This: Repr, Rhs: Repr>(
-            WrapOf<This, Ref<'a, This>>,
-            WrapOf<Rhs, Ref<'a, Rhs>>,
-        );
+        pub struct OpEq<'a, This: Repr, Rhs: Repr>(Ref<'a, This>, Ref<'a, Rhs>);
 
         impl<'a, This: Repr, Rhs: Repr> Repr for OpEq<'a, This, Rhs>
         where
-            UnrefT<This>: std::cmp::PartialEq<UnrefT<Rhs>>,
+        //UnrefT<This>: std::cmp::PartialEq<UnrefT<Rhs>>,
         {
             type T = bool;
-            type W = This::W;
         }
 
         pub trait OpsTrait<Rhs: Repr = Self>: Repr
@@ -177,87 +145,59 @@ pub mod introspect {
             UnrefT<Rhs>: ?Sized,
         {
             // Required method
-            type EqOutput: Repr<T = bool>;
-            fn eq<'a>(self, other: Rhs) -> Self::EqOutput
+            type EqOutput<'a>: Repr<T = bool>
             where
                 Self: IsRef<'a>,
-                Rhs: IsRef<'a>;
+                Rhs: IsRef<'a>,
+                Self::Unref: 'a,
+                Rhs::Unref: 'a;
+            fn eq<'a>(self, other: Rhs) -> Self::EqOutput<'a>
+            where
+                Self: IsRef<'a>,
+                Rhs: IsRef<'a>,
+                Self::Unref: 'a,
+                Rhs::Unref: 'a;
 
             // Provided method
-            //type NeOutput<'a>: Repr<T = bool> = Not<Self::EqOutput<'a>>;
-            //fn ne<'a>(&'a self, other: &'a Rhs) -> Self::NeOutput<'a> {
-            //    Not(self.eq(other)).promise_default_method_output()
-            //}
+            type NeOutput<'a>: Repr<T = bool>
+                = Not<Self::EqOutput<'a>>
+            where
+                Self: IsRef<'a>,
+                Rhs: IsRef<'a>,
+                Self::Unref: 'a,
+                Rhs::Unref: 'a;
+            fn ne<'a>(self, other: Rhs) -> Self::NeOutput<'a>
+            where
+                Self: Sized + IsRef<'a>,
+                Rhs: IsRef<'a>,
+                Self::Unref: 'a,
+                Rhs::Unref: 'a,
+            {
+                Not(self.eq(other)).promise_default_method_output()
+            }
         }
 
         impl<This: Repr, Rhs: Repr> OpsTrait<Rhs> for This
         where
-          UnrefT<This>: std::cmp::PartialEq<UnrefT<Rhs>>
-          {
-              type EqOutput = impl Repr<T = bool>;
-              fn eq<'a>(self, other: Rhs) -> Self::EqOutput
+            UnrefT<This>: std::cmp::PartialEq<UnrefT<Rhs>>,
+        {
+            type EqOutput<'a>
+                = impl Repr<T = bool>
             where
                 Self: IsRef<'a>,
-                Rhs: IsRef<'a> {
-                OpEq::<'a, Self, Rhs>(wrap::<Self, _>(self.into_ref()), wrap(other.into_ref()))
+                Rhs: IsRef<'a>,
+                Self::Unref: 'a,
+                Rhs::Unref: 'a;
+            fn eq<'a>(self, other: Rhs) -> Self::EqOutput<'a>
+            where
+                Self: IsRef<'a>,
+                Rhs: IsRef<'a>,
+                Self::Unref: 'a,
+                Rhs::Unref: 'a,
+            {
+                OpEq(self.into_ref(), other.into_ref())
             }
-          }
+        }
     }
 }
 
-/*
-macro_rules! skip
-
-pub trait PartialEq<Rhs = Self>
-where
-    Rhs: ?Sized,
-{
-    // Required method
-    fn eq(&self, other: &Rhs) -> bool;
-
-    // Provided method
-    fn ne(&self, other: &Rhs) -> bool { ... }
-}
-*/
-
-/*
-
-pub trait BitXor<Rhs = Self> {
-    type Output;
-
-    // Required method
-    fn bitxor(self, rhs: Rhs) -> Self::Output;
-}
-
-pub trait PartialOrd<Rhs = Self>: PartialEq<Rhs>
-where
-    Rhs: ?Sized,
-{
-    // Required method
-    fn partial_cmp(&self, other: &Rhs) -> Option<Ordering>;
-
-pub trait PartialEq<Rhs = Self>
-where
-    Rhs: ?Sized,
-{
-    // Required method
-    fn eq(&self, other: &Rhs) -> bool;
-
-#[derive(Default)]
-struct Fgen;
-impl<'a> FnOnce<(&'a u64,)> for Fgen {
-    type Output = u64;
-    extern "rust-call" fn call_once(self, b: (&'a u64,)) -> Self::Output {
-        *b.0 ^ 0x123
-    }
-}
-
-#[derive(Default)]
-struct Pred;
-impl<'a> FnOnce<(&'a u64,)> for Pred {
-    type Output = bool;
-    extern "rust-call" fn call_once(self, b: (&'a u64,)) -> Self::Output {
-        *b.0 < 35 || *b.0 % 31 == 0
-    }
-}
-*/

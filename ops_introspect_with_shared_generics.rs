@@ -13,28 +13,53 @@ macro_rules! shared_generics {
     ([$($t:tt)*]) => {};
 
     (
-        [[$($Gen:tt)*][$($Whp:tt)*]]
+        [[$($Gen:tt)*][$($Whp:tt)*][$($Als:tt)*]]
         impl __<[$($Trt:tt)*]> for $Typ:ty $(where $($Wht:ty: __<[$($Wtr:tt)*]>),* $(,)? )? { $($code:tt)* }
         $($rest:tt)*
     ) => {
-        impl $($Gen)* $($Trt)* for $Typ where $($( $Wht: $($Wtr)*, )*)? $($Whp)* { $($code)* }
-        shared_generics! { [[$($Gen)*][$($Whp)*]] $($rest)* }
+        const _: () = {
+            $($Als)*
+            impl $($Gen)* $($Trt)* for $Typ where $($( $Wht: $($Wtr)*, )*)? $($Whp)* { $($code)* }
+        };
+        shared_generics! { [[$($Gen)*][$($Whp)*][$($Als)*]] $($rest)* }
     };
 
     (
-        [[$($Gen:tt)*][$($Whp:tt)*]]
+        [[$($Gen:tt)*][$($Whp:tt)*][$($Als:tt)*]]
         $vis:vis fn $name:ident<__> ($($args:tt)*) $( -> $Typ:ty )? { $($code:tt)* }
         $($rest:tt)*
     ) => {
-        $vis fn $name $($Gen)* ($($args)*) $( -> $Typ )? where $($Whp)* { $($code)* }
-        shared_generics! { [[$($Gen)*][$($Whp)*]] $($rest)* }
+        paste::paste! {
+            mod [<__ $name _with_aliases__>] {
+                use super::*;
+                $($Als)*
+                pub fn $name $($Gen)* ($($args)*) $( -> $Typ )? where $($Whp)* { $($code)* }
+            }
+            $vis use [<__ $name _with_aliases__>]::$name;
+        }
+        shared_generics! { [[$($Gen)*][$($Whp)*][$($Als)*]] $($rest)* }
     };
 
     (
-        #[__([ impl [$($Gen:tt)*] $(where $($Whp:tt)*)? ]__)]
+        #[__([
+            impl [$($Gen:tt)*]
+            $(where [ $($Whp:tt)* ])? {
+                $($Alias:ident!() = $Aty:ty;)*
+            }
+         ]__)]
         const _: () = { $($code:tt)* };
     ) => {
-        shared_generics! { [[$($Gen)*][$($($Whp)*)?]] $($code)* }
+        shared_generics! {
+            [
+                [$($Gen)*]
+                [$($($Whp)*)?]
+                [$(
+                    #[allow(unused_macros)]
+                    macro_rules! $Alias { () => { $Aty } }
+                )*]
+            ]
+            $($code)*
+        }
     };
 }
 
@@ -73,16 +98,19 @@ shared_generics!(
     #[__([
 
         impl [< const NAME: &'static str, Deps: ?Sized, T >]
-        where
+        where [
             Node<NAME, Deps>: Meta<T>,
+        ] {
+            Repr!() = Repr<Node<NAME, Deps>, T>;
+        }
 
      ]__)]
     const _: () = {
-        pub fn repr<__>(inner: InnerOf<Repr<Node<NAME, Deps>, T>>) -> Repr<Node<NAME, Deps>, T> {
+        pub fn repr<__>(inner: InnerOf<Repr!()>) -> Repr!() {
             Repr { inner }
         }
 
-        impl __<[fmt::Debug]> for Repr<Node<NAME, Deps>, T>
+        impl __<[fmt::Debug]> for Repr!()
         where
             InnerOf<Self>: __<[fmt::Debug]>,
         {
@@ -107,16 +135,19 @@ shared_generics!(
     #[__([
 
         impl [< 'a, M: Meta<T>, T >]
-        where
+        where [
             M::Inner: 'a,
+        ] {
+            Node!() = Node<"Ref", (&'a (), M)>;
+        }
 
      ]__)]
     const _: () = {
-        impl __<[Meta<&'a T>]> for Node<"Ref", (&'a (), M)> {
+        impl __<[Meta<&'a T>]> for Node!() {
             type Inner = &'a M::Inner;
         }
 
-        fn new_ref<__>(repr: &'a Repr<M, T>) -> Repr<Node<"Ref", (&'a (), M)>, &'a T> {
+        fn new_ref<__>(repr: &'a Repr<M, T>) -> Repr<Node!(), &'a T> {
             Repr { inner: &repr.inner }
         }
     };
@@ -125,16 +156,18 @@ shared_generics!(
 shared_generics!(
     #[__([
 
-        impl [< M: Meta<T>, T: ops::Not >]
+        impl [< M: Meta<T>, T: ops::Not >] {
+            Node!() = Node<"Not", (M, T)>;
+        }
 
      ]__)]
     const _: () = {
-        impl __<[Meta<T::Output>]> for Node<"Not", (M, T)> {
+        impl __<[Meta<T::Output>]> for Node!() {
             type Inner = M::Inner;
         }
 
         impl __<[ops::Not]> for Repr<M, T> {
-            type Output = Repr<Node<"Not", (M, T)>, T::Output>;
+            type Output = Repr<Node!(), T::Output>;
             fn not(self) -> Self::Output {
                 Repr { inner: self.inner }
             }
@@ -146,18 +179,22 @@ shared_generics!(
     #[__([
 
         impl [< ThisM: Meta<ThisT>, ThisT, RhsM: Meta<RhsT>, RhsT >]
-        where
+        where [
             ThisT: ops::Add<RhsT>
+        ] {
+            Node!() = Node<"Add", (ThisM, ThisT, RhsM, RhsT)>;
+            Rhs!() = Repr<RhsM, RhsT>;
+        }
 
      ]__)]
     const _: () = {
-        impl __<[Meta<ThisT::Output>]> for Node<"Add", (ThisM, ThisT, RhsM, RhsT)> {
+        impl __<[Meta<ThisT::Output>]> for Node!() {
             type Inner = (ThisM::Inner, RhsM::Inner);
         }
 
-        impl __<[ops::Add<Repr<RhsM, RhsT>>]> for Repr<ThisM, ThisT> {
-            type Output = Repr<Node<"Add", (ThisM, ThisT, RhsM, RhsT)>, ThisT::Output>;
-            fn add(self, rhs: Repr<RhsM, RhsT>) -> Self::Output {
+        impl __<[ops::Add<Rhs!()>]> for Repr<ThisM, ThisT> {
+            type Output = Repr<Node!(), ThisT::Output>;
+            fn add(self, rhs: Rhs!()) -> Self::Output {
                 Repr {
                     inner: (self.inner, rhs.inner),
                 }
@@ -183,30 +220,35 @@ shared_generics!(
     #[__([
 
         impl [< M: Meta<T>, T, F >]
-        where
+        where [
             F: FnOnce<(Repr<M, T>,)>,
             F::Output: ReprTrait,
+        ] {
+            NodeLambda!() = Node<"Lambda", (M, T)>;
+            NodeApply!() = Node<"Apply", (M, T, F)>;
+            DebugLambda!() = DebugLambda<Repr<M, T>, F::Output, F>;
+        }
 
      ]__)]
     const _: () = {
-        impl __<[Meta<F>]> for Node<"Lambda", (M, T)> {
-            type Inner = DebugLambda<Repr<M, T>, F::Output, F>;
+        impl __<[Meta<F>]> for NodeLambda!() {
+            type Inner = DebugLambda!();
         }
 
-        fn new_lambda<__>(inner: F) -> Repr<Node<"Lambda", (M, T)>, F> {
+        fn new_lambda<__>(inner: F) -> Repr<NodeLambda!(), F> {
             Repr {
                 inner: DebugLambda(inner, Ph),
             }
         }
 
-        impl __<[Meta<F::Output>]> for Node<"Apply", (M, T, F)> {
-            type Inner = (DebugLambda<Repr<M, T>, F::Output, F>, M::Inner);
+        impl __<[Meta<F::Output>]> for NodeApply!() {
+            type Inner = (DebugLambda!(), M::Inner);
         }
 
         fn new_apply<__>(
-            lam: Repr<Node<"Lambda", (M, T)>, F>,
+            lam: Repr<NodeLambda!(), F>,
             arg: Repr<M, T>,
-        ) -> Repr<Node<"Apply", (M, T, F)>, F::Output> {
+        ) -> Repr<NodeApply!(), F::Output> {
             Repr {
                 inner: (lam.inner, arg.inner),
             }

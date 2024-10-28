@@ -27,35 +27,36 @@ pub fn pretty_type<T: ?Sized>(indent: usize) -> String {
         start: bool,
         inside_tuple: bool,
     }
+    impl Indent {
+        fn out(&mut self, a: &[&str]) {
+            for b in a {
+                self.output.push_str(b);
+            }
+        }
+    }
     impl<'ast> Visit<'ast> for Indent {
         fn visit_type_tuple(&mut self, node: &'ast TypeTuple) {
             if node.elems.len() > 0 {
-                self.inside_tuple = true;
-                self.output.push_str("\n");
-                self.output.push_str("    ".repeat(self.indent).as_str());
-                self.output.push_str("(");
+                self.out(&["\n", "    ".repeat(self.indent).as_str(), "("]);
                 self.indent += 1;
+                self.inside_tuple = true;
                 visit::visit_type_tuple(self, node);
                 self.indent -= 1;
-                self.output.push_str("\n");
-                self.output.push_str("    ".repeat(self.indent).as_str());
-                self.output.push_str(")");
                 self.inside_tuple = false;
+                self.out(&["\n", "    ".repeat(self.indent).as_str(), ")"]);
             }
         }
         fn visit_type(&mut self, node: &'ast Type) {
             if self.inside_tuple || self.start {
+                let tstr = quote::quote!(#node).to_string();
+                let hstr = REPR_FMT_REGEX_TUPLE.replace(tstr.as_str(), "_");
+                if !self.start {
+                    self.out(&["\n"]);
+                }
+                self.out(&["    ".repeat(self.indent).as_str(), &hstr, ","]);
+                self.start = false;
                 let backup = self.inside_tuple;
                 self.inside_tuple = false;
-                let tstr = quote::quote!(#node).to_string();
-                let tstr2 = REPR_FMT_REGEX_TUPLE.replace(tstr.as_str(), "_");
-                if !self.start {
-                    self.output.push_str("\n");
-                }
-                self.start = false;
-                self.output.push_str("    ".repeat(self.indent).as_str());
-                self.output.push_str(&tstr2);
-                self.output.push_str(",");
                 visit::visit_type(self, node);
                 self.inside_tuple = backup;
             } else {
@@ -71,7 +72,6 @@ pub fn pretty_type<T: ?Sized>(indent: usize) -> String {
     };
     indent.visit_type(&typ);
     indent.output
-    //quote::quote!(#typ).to_string()
 }
 
 pub trait Meta<T: ?Sized> {

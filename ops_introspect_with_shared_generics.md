@@ -18,7 +18,9 @@ b) Syntax Benefits:
 - Better visual structure for related implementations
 - More maintainable WHERE clauses
 
-3. Macro Mechanics:shared_generics!(
+3. Macro Mechanics:
+```
+shared_generics!(
     #[__([
         impl [<generic parameters>]
         where
@@ -28,10 +30,13 @@ b) Syntax Benefits:
         // implementations
     };
 );
+```
 
 4. Specific Improvements Over Original Code:
 
-Before (Original):impl<'a, M: Meta<T>, T> Meta<&'a T> for Node<"Ref", (&'a (), M)>
+Before (Original):
+```
+impl<'a, M: Meta<T>, T> Meta<&'a T> for Node<"Ref", (&'a (), M)>
 where
     M::Inner: 'a,
 {
@@ -44,8 +49,11 @@ where
 {
     // implementation
 }
+```
 
-After (With shared_generics):shared_generics!(
+After (With shared_generics):
+```
+shared_generics!(
     #[__([
         impl [<'a, M: Meta<T>, T>]
         where
@@ -61,6 +69,7 @@ After (With shared_generics):shared_generics!(
         }
     };
 );
+```
 
 5. Benefits:
 

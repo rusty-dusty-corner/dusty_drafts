@@ -1,4 +1,5 @@
 #![feature(unboxed_closures)]
+#![allow(incomplete_features)]
 #![feature(unsized_const_params)]
 
 use std::marker::PhantomData as Ph;
@@ -8,20 +9,69 @@ use lazy_static::lazy_static;
 use regex::Regex;
 
 lazy_static! {
-    static ref REPR_FMT_REGEX_PATH: Regex =
-        Regex::new(r"([A-Za-z]+[0-9A-Za-z]*::)(?<a>[A-Z]+[0-9A-Za-z]*)").unwrap();
-    static ref REPR_FMT_REGEX_CLOSURE: Regex =
-        Regex::new(r"\{\{closure\}\}").unwrap();
+    static ref REPR_FMT_REGEX_PATH: Regex = Regex::new(r"([A-Za-z][0-9A-Za-z]*::)*").unwrap();
+    static ref REPR_FMT_REGEX_CLOSURE: Regex = Regex::new(r"\{\{closure\}\}").unwrap();
+    static ref REPR_FMT_REGEX_TUPLE: Regex = Regex::new(r"\(.+\)").unwrap();
 }
 
-pub fn pretty_type<T: ?Sized>() -> String {
-    use quote::ToTokens;
-    use syn;
+pub fn pretty_type<T: ?Sized>(indent: usize) -> String {
+    use syn::visit::{self, Visit};
+    use syn::{self, Type, TypeTuple};
     let tstr_long = std::any::type_name::<T>();
-    let tstr1 = REPR_FMT_REGEX_PATH.replace_all(tstr_long, "$a");
-    let tstr2 = REPR_FMT_REGEX_CLOSURE.replace_all(&tstr1, "Closure");
+    let tstr1 = REPR_FMT_REGEX_PATH.replace_all(tstr_long, "");
+    let tstr2 = REPR_FMT_REGEX_CLOSURE.replace_all(&tstr1, "_Closure_");
     let typ = syn::parse_str::<syn::Type>(&tstr2).unwrap();
-    quote::quote!(#typ).to_string()
+    struct Indent {
+        indent: usize,
+        output: String,
+        start: bool,
+        inside_tuple: bool,
+    }
+    impl<'ast> Visit<'ast> for Indent {
+        fn visit_type_tuple(&mut self, node: &'ast TypeTuple) {
+            if node.elems.len() > 0 {
+                self.inside_tuple = true;
+                self.output.push_str("\n");
+                self.output.push_str("    ".repeat(self.indent).as_str());
+                self.output.push_str("(");
+                self.indent += 1;
+                visit::visit_type_tuple(self, node);
+                self.indent -= 1;
+                self.output.push_str("\n");
+                self.output.push_str("    ".repeat(self.indent).as_str());
+                self.output.push_str(")");
+                self.inside_tuple = false;
+            }
+        }
+        fn visit_type(&mut self, node: &'ast Type) {
+            if self.inside_tuple || self.start {
+                let backup = self.inside_tuple;
+                self.inside_tuple = false;
+                let tstr = quote::quote!(#node).to_string();
+                let tstr2 = REPR_FMT_REGEX_TUPLE.replace(tstr.as_str(), "_");
+                if !self.start {
+                    self.output.push_str("\n");
+                }
+                self.start = false;
+                self.output.push_str("    ".repeat(self.indent).as_str());
+                self.output.push_str(&tstr2);
+                self.output.push_str(",");
+                visit::visit_type(self, node);
+                self.inside_tuple = backup;
+            } else {
+                visit::visit_type(self, node);
+            }
+        }
+    }
+    let mut indent = Indent {
+        indent,
+        output: String::new(),
+        start: true,
+        inside_tuple: false,
+    };
+    indent.visit_type(&typ);
+    indent.output
+    //quote::quote!(#typ).to_string()
 }
 
 pub trait Meta<T: ?Sized> {
@@ -69,7 +119,7 @@ where
     InnerOf<Self>: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct(format!("Repr<Node<\"{}\", {}>>", NAME, pretty_type::<Deps>()).as_str())
+        f.debug_struct(pretty_type::<Self>(0).as_str())
             .field("inner", &self.inner)
             .finish()
     }
@@ -80,7 +130,7 @@ impl<T> Meta<T> for Node<"Value", ()> {
 }
 
 impl<T: ?Sized> Meta<T> for Node<"Undef", ()> {
-    type Inner = Ph<Box<T>>;
+    type Inner = Ph<T>;
 }
 
 impl<'a, M: Meta<T>, T> Meta<&'a T> for Node<"Ref", (&'a (), M)>
@@ -135,9 +185,9 @@ pub struct DebugLambda<A, B, F>(F, Ph<(A, B)>);
 impl<A, B, F> fmt::Debug for DebugLambda<A, B, F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_fmt(format_args!(
-            "FnOnce({}) -> {}",
-            pretty_type::<A>(),
-            pretty_type::<B>()
+            "impl FnOnce\n    (\n{}\n    ) ->\n{}",
+            pretty_type::<A>(2),
+            pretty_type::<B>(2)
         ))
     }
 }
@@ -185,35 +235,170 @@ fn main() {
     let a = repr::<"Value", (), _>(123_i32);
     let b = repr::<"Undef", (), i32>(Ph);
     let c = !(a + b);
-    println!("{:#?}", c);
+    println!("{:#?}\n\n", c);
     let d = new_ref(&c);
-    println!("{:#?}", d);
+    println!("{:#?}\n\n", d);
     let f = new_lambda(|x| !x);
+    println!("{:#?}\n\n", f);
     let e = new_apply(f, c);
-    println!("{:#?}", e);
+    println!("{:#?}\n\n", e);
 }
 
 /*
 
 Standard Output
-Repr<Node<"Not", (Node<"Add", (Node<"Value", ()>, i32, Node<"Undef", ()>, i32)>, i32)>> {
+
+
+Repr < Node < "Not" , _ > , i32 >,
+(
+    Node < "Add" , _ >,
+    (
+        Node < "Value" , () >,
+        i32,
+        Node < "Undef" , () >,
+        i32,
+    )
+    i32,
+) {
     inner: (
         123,
-        PhantomData<alloc::boxed::Box<i32>>,
+        PhantomData<i32>,
     ),
 }
-Repr<Node<"Ref", (&(), Node<"Not", (Node<"Add", (Node<"Value", ()>, i32, Node<"Undef", ()>, i32)>, i32)>)>> {
+
+
+Repr < Node < "Ref" , _ > , & i32 >,
+(
+    & (),
+    Node < "Not" , _ >,
+    (
+        Node < "Add" , _ >,
+        (
+            Node < "Value" , () >,
+            i32,
+            Node < "Undef" , () >,
+            i32,
+        )
+        i32,
+    )
+) {
     inner: (
         123,
-        PhantomData<alloc::boxed::Box<i32>>,
+        PhantomData<i32>,
     ),
 }
-Repr<Node<"Apply", (Node<"Not", (Node<"Add", (Node<"Value", ()>, i32, Node<"Undef", ()>, i32)>, i32)>, i32, playground::main::{{closure}})>> {
+
+
+Repr < Node < "Lambda" , _ > , _Closure_ >,
+(
+    Node < "Not" , _ >,
+    (
+        Node < "Add" , _ >,
+        (
+            Node < "Value" , () >,
+            i32,
+            Node < "Undef" , () >,
+            i32,
+        )
+        i32,
+    )
+    i32,
+) {
+    inner: impl FnOnce
+        (
+            Repr < Node < "Not" , _ > , i32 >,
+            (
+                Node < "Add" , _ >,
+                (
+                    Node < "Value" , () >,
+                    i32,
+                    Node < "Undef" , () >,
+                    i32,
+                )
+                i32,
+            )
+        ) ->
+            Repr < Node < "Not" , _ > , i32 >,
+            (
+                Node < "Not" , _ >,
+                (
+                    Node < "Add" , _ >,
+                    (
+                        Node < "Value" , () >,
+                        i32,
+                        Node < "Undef" , () >,
+                        i32,
+                    )
+                    i32,
+                )
+                i32,
+            ),
+}
+
+
+Repr < Node < "Apply" , _ > , i32 > >,
+(
+    Node < "Not" , _ >,
+    (
+        Node < "Add" , _ >,
+        (
+            Node < "Value" , () >,
+            i32,
+            Node < "Undef" , () >,
+            i32,
+        )
+        i32,
+    )
+    i32,
+    _Closure_,
+)
+(
+    Node < "Not" , _ >,
+    (
+        Node < "Add" , _ >,
+        (
+            Node < "Value" , () >,
+            i32,
+            Node < "Undef" , () >,
+            i32,
+        )
+        i32,
+    )
+    i32,
+) {
     inner: (
-        FnOnce(playground::Repr<Node<"Not", (Node<"Add", (Node<"Value", ()>, i32, Node<"Undef", ()>, i32)>, i32)>, i32>) -> playground::Repr<Node<"Not", (Node<"Not", (Node<"Add", (Node<"Value", ()>, i32, Node<"Undef", ()>, i32)>, i32)>, i32)>, i32>,
+        impl FnOnce
+            (
+                Repr < Node < "Not" , _ > , i32 >,
+                (
+                    Node < "Add" , _ >,
+                    (
+                        Node < "Value" , () >,
+                        i32,
+                        Node < "Undef" , () >,
+                        i32,
+                    )
+                    i32,
+                )
+            ) ->
+                Repr < Node < "Not" , _ > , i32 >,
+                (
+                    Node < "Not" , _ >,
+                    (
+                        Node < "Add" , _ >,
+                        (
+                            Node < "Value" , () >,
+                            i32,
+                            Node < "Undef" , () >,
+                            i32,
+                        )
+                        i32,
+                    )
+                    i32,
+                ),
         (
             123,
-            PhantomData<alloc::boxed::Box<i32>>,
+            PhantomData<i32>,
         ),
     ),
 }

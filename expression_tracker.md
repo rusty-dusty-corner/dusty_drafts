@@ -1,4 +1,4 @@
-# Type-Level Expression Tracking (suggested name: expression_tracker.rs)
+# Type-Level Expression Tracking
 
 ## Core Concept Analysis
 

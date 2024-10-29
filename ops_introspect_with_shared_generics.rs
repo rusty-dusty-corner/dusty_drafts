@@ -41,18 +41,15 @@ macro_rules! shared_generics {
     };
 
     (
-        #[__([
-            impl [$($Gen:tt)*]
-            $(where [ $($Whp:tt)* ])? {
-                $($Alias:ident!() = $Aty:ty;)*
-            }
-         ]__)]
-        const _: () = { $($code:tt)* };
+        #[params($($Gen:tt)*)]
+        $(#[_where($($Whp:tt)*)])*
+        $(#[__([ $Alias:ident!() = $Aty:ty ]__)])*
+        const _: () = {$($code:tt)*};
     ) => {
         shared_generics! {
             [
                 [$($Gen)*]
-                [$($($Whp)*)?]
+                [$($($Whp)*,)*]
                 [$(
                     #[allow(unused_macros)]
                     macro_rules! $Alias { () => { $Aty } }
@@ -95,16 +92,9 @@ pub type InnerOf<R> = <<R as ReprTrait>::M as Meta<<R as ReprTrait>::T>>::Inner;
 
 // So very interesting, i use rustfmt here and it works, also addition `where` predicates is used in `impl` :)
 shared_generics!(
-    #[__([
-
-        impl [< const NAME: &'static str, Deps: ?Sized, T >]
-        where [
-            Node<NAME, Deps>: Meta<T>,
-        ] {
-            Repr!() = Repr<Node<NAME, Deps>, T>;
-        }
-
-     ]__)]
+    #[params(< const NAME: &'static str, Deps: ?Sized, T >)]
+    #[_where( Node<NAME, Deps>: Meta<T> )]
+    #[__([ Repr!() = Repr<Node<NAME, Deps>, T> ]__)]
     const _: () = {
         pub fn repr<__>(inner: InnerOf<Repr!()>) -> Repr!() {
             Repr { inner }
@@ -132,16 +122,9 @@ impl<T: ?Sized> Meta<T> for Node<"Undef", ()> {
 }
 
 shared_generics!(
-    #[__([
-
-        impl [< 'a, M: Meta<T>, T >]
-        where [
-            M::Inner: 'a,
-        ] {
-            Node!() = Node<"Ref", (&'a (), M)>;
-        }
-
-     ]__)]
+    #[params(< 'a, M: Meta<T>, T >)]
+    #[_where( M::Inner: 'a )]
+    #[__([ Node!() = Node<"Ref", (&'a (), M)> ]__)]
     const _: () = {
         impl __<[Meta<&'a T>]> for Node!() {
             type Inner = &'a M::Inner;
@@ -155,12 +138,9 @@ shared_generics!(
 
 macro_rules! decl_unary_op {
     ($NAME:literal, $Name:ident, $name:ident) => {
-        shared_generics! {
-            #[__([
-                impl [< M: Meta<T>, T: ops::$Name >] {
-                    Node!() = Node<$NAME, (M, T)>;
-                }
-             ]__)]
+        shared_generics!(
+            #[params(< M: Meta<T>, T: ops::$Name >)]
+            #[__([ Node!() = Node<$NAME, (M, T)> ]__)]
             const _: () = {
                 impl __<[Meta<T::Output>]> for Node!() {
                     type Inner = M::Inner;
@@ -173,22 +153,17 @@ macro_rules! decl_unary_op {
                     }
                 }
             };
-        }
+        );
     };
 }
 
 macro_rules! decl_binary_op {
     ($NAME:literal, $Name:ident, $name:ident) => {
-        shared_generics! {
-            #[__([
-                impl [< ThisM: Meta<ThisT>, ThisT, RhsM: Meta<RhsT>, RhsT >]
-                where [
-                    ThisT: ops::$Name<RhsT>
-                ] {
-                    Node!() = Node<$NAME, (ThisM, ThisT, RhsM, RhsT)>;
-                    Rhs!() = Repr<RhsM, RhsT>;
-                }
-             ]__)]
+        shared_generics!(
+            #[params(< ThisM: Meta<ThisT>, ThisT, RhsM: Meta<RhsT>, RhsT >)]
+            #[_where( ThisT: ops::$Name<RhsT> )]
+            #[__([ Node!() = Node<$NAME, (ThisM, ThisT, RhsM, RhsT)> ]__)]
+            #[__([ Rhs!() = Repr<RhsM, RhsT> ]__)]
             const _: () = {
                 impl __<[Meta<ThisT::Output>]> for Node!() {
                     type Inner = (ThisM::Inner, RhsM::Inner);
@@ -203,7 +178,7 @@ macro_rules! decl_binary_op {
                     }
                 }
             };
-        }
+        );
     };
 }
 
@@ -240,17 +215,12 @@ impl<A, B, F> fmt::Debug for DebugLambda<A, B, F> {
 }
 
 shared_generics!(
-    #[__([
-        impl [< M: Meta<T>, T, F >]
-        where [
-            F: FnOnce<(Repr<M, T>,)>,
-            F::Output: ReprTrait,
-        ] {
-            NodeLambda!() = Node<"Lambda", (M, T)>;
-            NodeApply!() = Node<"Apply", (M, T, F)>;
-            DebugLambda!() = DebugLambda<Repr<M, T>, F::Output, F>;
-        }
-     ]__)]
+    #[params(< M: Meta<T>, T, F >)]
+    #[_where( F: FnOnce<(Repr<M, T>,)> )]
+    #[_where( F::Output: ReprTrait )]
+    #[__([ NodeLambda!() = Node<"Lambda", (M, T)> ]__)]
+    #[__([ NodeApply!() = Node<"Apply", (M, T, F)> ]__)]
+    #[__([ DebugLambda!() = DebugLambda<Repr<M, T>, F::Output, F> ]__)]
     const _: () = {
         impl __<[Meta<F>]> for NodeLambda!() {
             type Inner = DebugLambda!();

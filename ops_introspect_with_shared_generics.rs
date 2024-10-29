@@ -153,55 +153,70 @@ shared_generics!(
     };
 );
 
-shared_generics!(
-    #[__([
-
-        impl [< M: Meta<T>, T: ops::Not >] {
-            Node!() = Node<"Not", (M, T)>;
-        }
-
-     ]__)]
-    const _: () = {
-        impl __<[Meta<T::Output>]> for Node!() {
-            type Inner = M::Inner;
-        }
-
-        impl __<[ops::Not]> for Repr<M, T> {
-            type Output = Repr<Node!(), T::Output>;
-            fn not(self) -> Self::Output {
-                Repr { inner: self.inner }
-            }
-        }
-    };
-);
-
-shared_generics!(
-    #[__([
-
-        impl [< ThisM: Meta<ThisT>, ThisT, RhsM: Meta<RhsT>, RhsT >]
-        where [
-            ThisT: ops::Add<RhsT>
-        ] {
-            Node!() = Node<"Add", (ThisM, ThisT, RhsM, RhsT)>;
-            Rhs!() = Repr<RhsM, RhsT>;
-        }
-
-     ]__)]
-    const _: () = {
-        impl __<[Meta<ThisT::Output>]> for Node!() {
-            type Inner = (ThisM::Inner, RhsM::Inner);
-        }
-
-        impl __<[ops::Add<Rhs!()>]> for Repr<ThisM, ThisT> {
-            type Output = Repr<Node!(), ThisT::Output>;
-            fn add(self, rhs: Rhs!()) -> Self::Output {
-                Repr {
-                    inner: (self.inner, rhs.inner),
+macro_rules! decl_unary_op {
+    ($NAME:literal, $Name:ident, $name:ident) => {
+        shared_generics! {
+            #[__([
+                impl [< M: Meta<T>, T: ops::$Name >] {
+                    Node!() = Node<$NAME, (M, T)>;
                 }
-            }
+             ]__)]
+            const _: () = {
+                impl __<[Meta<T::Output>]> for Node!() {
+                    type Inner = M::Inner;
+                }
+
+                impl __<[ops::$Name]> for Repr<M, T> {
+                    type Output = Repr<Node!(), T::Output>;
+                    fn $name(self) -> Self::Output {
+                        Repr { inner: self.inner }
+                    }
+                }
+            };
         }
     };
-);
+}
+
+macro_rules! decl_binary_op {
+    ($NAME:literal, $Name:ident, $name:ident) => {
+        shared_generics! {
+            #[__([
+                impl [< ThisM: Meta<ThisT>, ThisT, RhsM: Meta<RhsT>, RhsT >]
+                where [
+                    ThisT: ops::$Name<RhsT>
+                ] {
+                    Node!() = Node<$NAME, (ThisM, ThisT, RhsM, RhsT)>;
+                    Rhs!() = Repr<RhsM, RhsT>;
+                }
+             ]__)]
+            const _: () = {
+                impl __<[Meta<ThisT::Output>]> for Node!() {
+                    type Inner = (ThisM::Inner, RhsM::Inner);
+                }
+
+                impl __<[ops::$Name<Rhs!()>]> for Repr<ThisM, ThisT> {
+                    type Output = Repr<Node!(), ThisT::Output>;
+                    fn $name(self, rhs: Rhs!()) -> Self::Output {
+                        Repr {
+                            inner: (self.inner, rhs.inner),
+                        }
+                    }
+                }
+            };
+        }
+    };
+}
+
+macro_rules! decl_unary_ops { ($($NAME:literal),*) => { paste::paste! {
+    $(decl_unary_op! { $NAME, [<$NAME:camel>], [<$NAME:lower>] })*
+} } }
+
+macro_rules! decl_binary_ops { ($($NAME:literal),*) => { paste::paste! {
+    $(decl_binary_op! { $NAME, [<$NAME:camel>], [<$NAME:lower>] })*
+} } }
+
+decl_unary_ops!("Not", "Neg");
+decl_binary_ops!("Add", "Sub", "Mul", "Div", "Rem", "Shl", "Shr", "BitAnd", "BitOr", "BitXor");
 
 #[repr(transparent)]
 pub struct DebugLambda<A, B, F>(F, Ph<(A, B)>);
@@ -218,7 +233,6 @@ impl<A, B, F> fmt::Debug for DebugLambda<A, B, F> {
 
 shared_generics!(
     #[__([
-
         impl [< M: Meta<T>, T, F >]
         where [
             F: FnOnce<(Repr<M, T>,)>,
@@ -228,7 +242,6 @@ shared_generics!(
             NodeApply!() = Node<"Apply", (M, T, F)>;
             DebugLambda!() = DebugLambda<Repr<M, T>, F::Output, F>;
         }
-
      ]__)]
     const _: () = {
         impl __<[Meta<F>]> for NodeLambda!() {
@@ -267,6 +280,8 @@ fn main() {
     println!("{:#?}\n\n", f);
     let e = new_apply(f, c);
     println!("{:#?}\n\n", e);
+    let g = (c - a) * b % a ^ b & a / repr::<"Undef", (), i32>(Ph);
+    println!("{:#?}\n\n", g);
 }
 
 lazy_static! {
@@ -338,7 +353,6 @@ pub fn pretty_type<T: ?Sized>(indent: usize) -> String {
 /*
 
 Standard Output
-
 
 Repr < Node < "Not" , _ > , i32 >,
 (
@@ -490,6 +504,78 @@ Repr < Node < "Apply" , _ > , i32 > >,
         (
             123,
             PhantomData<i32>,
+        ),
+    ),
+}
+
+
+Repr < Node < "BitXor" , _ > , i32 >,
+(
+    Node < "Rem" , _ >,
+    (
+        Node < "Mul" , _ >,
+        (
+            Node < "Sub" , _ >,
+            (
+                Node < "Not" , _ >,
+                (
+                    Node < "Add" , _ >,
+                    (
+                        Node < "Value" , () >,
+                        i32,
+                        Node < "Undef" , () >,
+                        i32,
+                    )
+                    i32,
+                )
+                i32,
+                Node < "Value" , () >,
+                i32,
+            )
+            i32,
+            Node < "Undef" , () >,
+            i32,
+        )
+        i32,
+        Node < "Value" , () >,
+        i32,
+    )
+    i32,
+    Node < "BitAnd" , _ >,
+    (
+        Node < "Undef" , () >,
+        i32,
+        Node < "Div" , _ >,
+        (
+            Node < "Value" , () >,
+            i32,
+            Node < "Undef" , () >,
+            i32,
+        )
+        i32,
+    )
+    i32,
+) {
+    inner: (
+        (
+            (
+                (
+                    (
+                        123,
+                        PhantomData<i32>,
+                    ),
+                    123,
+                ),
+                PhantomData<i32>,
+            ),
+            123,
+        ),
+        (
+            PhantomData<i32>,
+            (
+                123,
+                PhantomData<i32>,
+            ),
         ),
     ),
 }

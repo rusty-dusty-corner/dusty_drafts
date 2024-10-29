@@ -207,16 +207,24 @@ macro_rules! decl_binary_op {
     };
 }
 
-macro_rules! decl_unary_ops { ($($NAME:literal),*) => { paste::paste! {
+macro_rules! decl_unary_ops { ($($NAME:literal),* $(,)?) => { paste::paste! {
     $(decl_unary_op! { $NAME, [<$NAME:camel>], [<$NAME:lower>] })*
 } } }
 
-macro_rules! decl_binary_ops { ($($NAME:literal),*) => { paste::paste! {
+macro_rules! decl_binary_ops { ($($NAME:literal),* $(,)?) => { paste::paste! {
     $(decl_binary_op! { $NAME, [<$NAME:camel>], [<$NAME:lower>] })*
 } } }
 
-decl_unary_ops!("Not", "Neg");
-decl_binary_ops!("Add", "Sub", "Mul", "Div", "Rem", "Shl", "Shr", "BitAnd", "BitOr", "BitXor");
+decl_unary_ops! {
+  "Not", "Neg",
+}
+
+decl_binary_ops! {
+    "Add", "Sub",
+    "Mul", "Div", "Rem",
+    "Shl", "Shr",
+    "BitAnd", "BitOr", "BitXor",
+}
 
 #[repr(transparent)]
 pub struct DebugLambda<A, B, F>(F, Ph<(A, B)>);

@@ -1,4 +1,41 @@
 
+Here's a description of the code updates:
+
+1. Macro Syntax Improvements:
+   - The shared_generics macro now has a cleaner syntax for parameter declarations
+   - Introduced new attribute-like syntax using ```#[params(...)]```, ```#[_where(...)]```, and ```#[__([...])__]```
+   - The formatting inside ```const _: ()``` blocks is now supported by rustfmt
+
+2. New Operation Macros:
+   - Added ```decl_unary_op!``` and ```decl_binary_op!``` helper macros to reduce code duplication
+   - Created ```decl_unary_ops!``` and ```decl_binary_ops!``` for batch operation declarations
+   - Added support for more operators:
+     - Unary: Not, Neg
+     - Binary: Add, Sub, Mul, Div, Rem, Shl, Shr, BitAnd, BitOr, BitXor
+
+3. Example Enhancement:
+   - Added a more complex expression example in ```main()```
+   - Demonstrates chaining of multiple operations:   ```let g = (c - a) * b % a ^ b & a / repr::<"Undef", (), i32>(Ph);```
+   
+4. Code Organization:
+   - Better separation of operation declarations using macro systems
+   - More consistent formatting throughout the codebase
+   - Improved readability with cleaner macro syntax
+
+5. Output Enhancement:
+   - The debug output now shows more complex nested expressions
+   - Better visualization of operation chains and their types
+
+The main improvements focus on:
+- More maintainable macro syntax
+- Extended operator support
+- Better code organization
+- Enhanced debugging output
+- More comprehensive examples
+
+These changes make the code more extensible and easier to maintain while preserving all the original functionality.
+
+
 Here's a detailed analysis of shared_generics usage in the improved code:
 
 1. Purpose and Overview

@@ -1,5 +1,3 @@
-
-
 #![feature(associated_type_defaults)]
 
 use std::marker::PhantomData as Ph;
@@ -63,8 +61,14 @@ pub type OperOf<T, A> = <T as Eval>::Oper<A>;
 pub type SuccessOf<T, Yes, No> = <T as Eval>::Success<Yes, No>;
 
 impl<A: Eval> Eval for Comm<A, ()> {
-    type Success<Yes, No> = A::Case<Yes, No>;
+    type Success<Yes, No> = A::Success<Yes, No>;
     type Oper<This> = A;
+}
+
+impl<A, B> Eval for Send<A, B>
+{
+    type Success<Yes, No> = No;
+    type Oper<This> = This;
 }
 
 impl<A, B, C, D, N> Eval for Comm<Send<A, B>, Recv<C, D, N>>
@@ -87,6 +91,7 @@ where
     type Oper<This> = A::EvalYesCase<Bind<B, D, N>, This>;
 }
 
+/*
 impl<A, B, C> Eval for Comm<Comm<A, B>, C>
 where
     Comm<A, B>: Eval,
@@ -96,6 +101,7 @@ where
     type Oper<This> =
         SuccessOf<Comm<A, B>, Comm<EvalOf<Comm<A, B>>, C>, EvalOf<Comm<A, Comm<B, C>>>>;
 }
+*/
 
 impl<A, B, C, D> Eval for Comm<Send<A, B>, Comm<C, D>>
 where
@@ -159,5 +165,13 @@ pub type TestA =
     Comm<Send<_A<()>, _B<_A<()>>>, Comm<(), Recv<_A<()>, _B<()>, Comm<(), Send<_B<()>, _B<()>>>>>>;
 
 fn main() {
-    println!("{:#?}", std::any::type_name::<TestA>());
+    println!("{:#?}", std::any::type_name::<EvalOf<TestA>>());
 }
+
+/*
+
+Standard Output
+
+"playground::Comm<playground::Comm<(), playground::Send<playground::_B<playground::_A<()>>, playground::_B<playground::_A<()>>>>, ()>"
+
+*/

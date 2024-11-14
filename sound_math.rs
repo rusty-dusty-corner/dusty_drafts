@@ -21,3 +21,25 @@ fn env(t: f64, period: f64, short: f64) -> f64 {
 fn sharp(sm: f64, t: f64) -> f64 {
    (t.sin().asin()/PI*2_f64*sm).atanh() / 2_f64.sqrt()
 }
+
+#[inline(always)]
+fn tri(t: f64) -> f64 {
+   let smooth = 0.9_f64;
+   (t.sin() * smooth).asin() / smooth
+}
+
+#[inline(always)]
+fn sinc(t: f64) -> f64 {
+    if t == 0_f64 { return 1_f64 }
+    t.sin() / t
+}
+
+#[inline(always)]
+fn trim(x: f64) -> f64 {
+    x.max(0_f64)
+}
+
+#[inline(always)]
+fn ln2(x: f64) -> f64 {
+    x.log(2_f64)
+}

@@ -1,8 +1,8 @@
-fn smooth(t: f64, delay: f64, phase: f64) -> f64 {
+fn smooth(t: f64, delay: f64, phase: f64, short: f64) -> f64 {
     let p = phase * PI;
     let a: f64 = (t / delay + p).tan().atan() * delay;
-    let b = (a - t/2_f64)/(PI*2_f64);
-    a.tanh() - b
+    let b = (a - t)/(PI*delay)*2.0;
+    ((a * short).tanh() - b) / short
 }
 
 #[inline(always)]

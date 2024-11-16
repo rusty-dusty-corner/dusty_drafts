@@ -57,3 +57,17 @@ fn sinc_osc(t: f64, impulse_freq: f64, sinc_freq: f64) -> f64 {
     let m2 = sinc_freq * 2.0 * PI;
     sinc(t2 * m2)
 }
+
+#[inline(always)]
+fn sinc_osc_plus(t: f64, impulse_freq: f64, sinc_freq: f64, a: f64, b: f64) -> f64 {
+    let m1 = impulse_freq * PI;
+    let t2 = tri(t * m1 + a) / m1;
+    let m2 = sinc_freq * 2.0 * PI;
+    sinc(t2 * m2 + b)
+}
+
+#[inline(always)]
+fn osc(t: f64) -> f64 {
+    let sample = (t * 440.0 * 2.0 * PI).sin();
+    sample
+}

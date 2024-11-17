@@ -29,6 +29,13 @@ fn tri(t: f64) -> f64 {
 }
 
 #[inline(always)]
+fn sub01(a: f64, b: f64, c: f64, d: f64, e: f64) -> f64 {
+    let x = ln2(a + 0.001) * PI - ln2(b) * PI;
+    ( 1.0 - rabbit( x ) ).powf(c) / (x*x+d).sqrt().powf(e)
+}
+
+
+#[inline(always)]
 fn sinc(t: f64) -> f64 {
     if t == 0_f64 { return 1_f64 }
     t.sin() / t

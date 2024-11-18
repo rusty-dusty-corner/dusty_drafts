@@ -73,6 +73,17 @@ fn sinc_osc_plus(t: f64, impulse_freq: f64, sinc_freq: f64, a: f64, b: f64) -> f
     sinc(t2 * m2 + b)
 }
 
+fn main() {
+    use rustfft::num_traits::FloatConst;
+    let spec = hound::WavSpec {
+        channels: 2,
+        sample_rate: SAMPLE_RATE,
+        bits_per_sample: 16,
+        sample_format: hound::SampleFormat::Int,
+    };
+    let mut rng = rand::thread_rng();
+}
+
 #[inline(always)]
 fn osc(t: f64) -> f64 {
     let sample = (t * 440.0 * 2.0 * PI).sin();

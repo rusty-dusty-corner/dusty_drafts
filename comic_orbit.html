@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Particle System</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+            background: #f0f0f0;
+        }
+        .controls {
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <button onclick="addRandomParticle()">Добавить частицу</button>
+        <button onclick="clearParticles()">Очистить</button>
+    </div>
+    <canvas id="canvas" width="1024" height="1024"></canvas>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let particles = [];
+let isDragging = false;
+let draggedParticle = null;
+
+// Класс частицы
+class Particle {
+    constructor() {
+        this.x = canvas.width / 2.0 + (Math.random() - 0.5) * canvas.width * 0.5;
+        this.y = canvas.height / 2.0 + (Math.random() - 0.5) * canvas.height * 0.5;
+        this.vx = 0.0; //(Math.random() - 0.5) * 0.1;
+        this.vy = 0.0; //(Math.random() - 0.5) * 0.1;
+        this.mass = Math.pow(4, Math.floor(Math.random() * 4)); // 1, 4, 16, 64
+        this.a = 5 + ( 100 + Math.atanh(Math.random() * 0.999) * 20 ) / this.mass; // параметр орбиты
+    }
+
+    // Цвет в зависимости от массы
+    getColor() {
+        if (this.mass === 1) return 'white';
+        if (this.mass === 4) return 'blue';
+        if (this.mass === 16) return 'green';
+        return 'red';
+    }
+}
+
+// Расчет силы между частицами
+function calculateForce(dist, a) {
+    const b = 1 / (a*a);
+    return 1/(dist*dist + 1) - b/(Math.pow(dist/a, 4) + b);
+}
+
+// Добавление случайной частицы
+function addRandomParticle() {
+    particles.push(new Particle());
+}
+
+// Очистка всех частиц
+function clearParticles() {
+    particles = [];
+}
+
+// Обработка взаимодействий
+function updateParticles() {
+    for (let i = 0; i < particles.length; i++) {
+        let p1 = particles[i];
+        
+        // Если частица не перетаскивается
+        if (p1 !== draggedParticle) {
+            // Сила к центру
+            let dx = canvas.width/2 - p1.x;
+            let dy = canvas.height/2 - p1.y;
+            let distToCenter = Math.sqrt(dx*dx + dy*dy);
+            let forceMag = distToCenter * 0.000001;
+            p1.vx += dx/distToCenter * forceMag;
+            p1.vy += dy/distToCenter * forceMag;
+
+            // Взаимодействие с другими частицами
+            for (let j = 0; j < particles.length; j++) {
+                if (i == j) continue;
+
+                let p2 = particles[j];
+                dx = p2.x - p1.x;
+                dy = p2.y - p1.y;
+
+                dx2 = dx * 0.5 + dy * 0.5;
+                dy2 = dy * 0.5 - dx * 0.5;
+
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < 0.1) continue;
+
+                let force = calculateForce(dist, p1.a + p2.a + ( p1.a * p2.a ) / 20.0) * 200.0;
+
+                let fx = dx * force;
+                let fy = dy * force;
+
+                if (force > 0.0) {
+                    fx = dx2 * force;
+                    fy = dy2 * force;
+                }
+
+                p1.vx += fx / p1.mass;
+                p1.vy += fy / p1.mass;
+                p2.vx -= fx / p2.mass;
+                p2.vy -= fy / p2.mass;
+            }
+
+            // Обновление позиции
+            p1.x += p1.vx;
+            p1.y += p1.vy;
+
+            // Затухание скорости
+            let fix = Math.max(1.0, distToCenter / (canvas.height/2.0));
+            p1.vx *= 0.1 / fix;
+            p1.vy *= 0.1 / fix;
+        }
+    }
+}
+
+// Отрисовка
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    particles.forEach(p => {
+        ctx.beginPath();
+        //ctx.arc(p.x, p.y, Math.sqrt(Math.pow(p.mass, 1.0/3.0)) * 2, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, p.a / 3.0, 0, Math.PI * 2);
+        ctx.fillStyle = p.getColor();
+        ctx.fill();
+    });
+}
+
+// Основной цикл
+function animate() {
+    updateParticles();
+    updateParticles();
+    updateParticles();
+    updateParticles();
+    draw();
+    requestAnimationFrame(animate);
+}
+
+// Обработка перетаскивания
+canvas.addEventListener('mousedown', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    particles.forEach(p => {
+        const dx = p.x - x;
+        const dy = p.y - y;
+        if (Math.sqrt(dx*dx + dy*dy) < Math.sqrt(p.mass) * 2) {
+            isDragging = true;
+            draggedParticle = p;
+        }
+    });
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    if (isDragging && draggedParticle) {
+        const rect = canvas.getBoundingClientRect();
+        draggedParticle.x = e.clientX - rect.left;
+        draggedParticle.y = e.clientY - rect.top;
+        draggedParticle.vx = 0;
+        draggedParticle.vy = 0;
+    }
+});
+
+canvas.addEventListener('mouseup', () => {
+    isDragging = false;
+    draggedParticle = null;
+});
+
+// Запуск анимации
+animate();
+</script>
+</body>
+</html>

@@ -14,8 +14,8 @@
 </head>
 <body>
     <div class="controls">
-        <button onclick="addRandomParticle()">Добавить частицу</button>
-        <button onclick="clearParticles()">Очистить</button>
+        <button onclick="addRandomParticle()">Add particle</button>
+        <button onclick="clearParticles()">Clear</button>
     </div>
     <canvas id="canvas" width="1024" height="1024"></canvas>
 
@@ -26,18 +26,16 @@ let particles = [];
 let isDragging = false;
 let draggedParticle = null;
 
-// Класс частицы
-class Particle {
+    class Particle {
     constructor() {
         this.x = canvas.width / 2.0 + (Math.random() - 0.5) * canvas.width * 0.5;
         this.y = canvas.height / 2.0 + (Math.random() - 0.5) * canvas.height * 0.5;
         this.vx = 0.0; //(Math.random() - 0.5) * 0.1;
         this.vy = 0.0; //(Math.random() - 0.5) * 0.1;
         this.mass = Math.pow(4, Math.floor(Math.random() * 4)); // 1, 4, 16, 64
-        this.a = 5 + ( 100 + Math.atanh(Math.random() * 0.999) * 20 ) / this.mass; // параметр орбиты
+        this.a = 5 + ( 100 + Math.atanh(Math.random() * 0.999) * 20 ) / this.mass;
     }
 
-    // Цвет в зависимости от массы
     getColor() {
         if (this.mass === 1) return 'white';
         if (this.mass === 4) return 'blue';
@@ -46,28 +44,23 @@ class Particle {
     }
 }
 
-// Расчет силы между частицами
 function calculateForce(dist, a) {
     const b = 1 / (a*a);
     return 1/(dist*dist + 1) - b/(Math.pow(dist/a, 4) + b);
 }
 
-// Добавление случайной частицы
 function addRandomParticle() {
     particles.push(new Particle());
 }
 
-// Очистка всех частиц
 function clearParticles() {
     particles = [];
 }
 
-// Обработка взаимодействий
 function updateParticles() {
     for (let i = 0; i < particles.length; i++) {
         let p1 = particles[i];
         
-        // Если частица не перетаскивается
         if (p1 !== draggedParticle) {
             // Сила к центру
             let dx = canvas.width/2 - p1.x;
@@ -77,7 +70,6 @@ function updateParticles() {
             p1.vx += dx/distToCenter * forceMag;
             p1.vy += dy/distToCenter * forceMag;
 
-            // Взаимодействие с другими частицами
             for (let j = 0; j < particles.length; j++) {
                 if (i == j) continue;
 
@@ -107,11 +99,9 @@ function updateParticles() {
                 p2.vy -= fy / p2.mass;
             }
 
-            // Обновление позиции
             p1.x += p1.vx;
             p1.y += p1.vy;
 
-            // Затухание скорости
             let fix = Math.max(1.0, distToCenter / (canvas.height/2.0));
             p1.vx *= 0.1 / fix;
             p1.vy *= 0.1 / fix;
@@ -119,7 +109,6 @@ function updateParticles() {
     }
 }
 
-// Отрисовка
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
@@ -132,7 +121,6 @@ function draw() {
     });
 }
 
-// Основной цикл
 function animate() {
     updateParticles();
     updateParticles();
@@ -142,7 +130,6 @@ function animate() {
     requestAnimationFrame(animate);
 }
 
-// Обработка перетаскивания
 canvas.addEventListener('mousedown', (e) => {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;

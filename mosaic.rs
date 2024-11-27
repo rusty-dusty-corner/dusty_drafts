@@ -15,16 +15,13 @@ fn lattice_centers(x: f64, y: f64, sz: f64) -> (f64, f64) {
 fn hex_lattice_centers(x: f64, y: f64, sz: f64) -> (f64, f64) {
     let sqrt3 = 3.0f64.sqrt();
     
-    // Размеры базового прямоугольника
     let hex_width = sz * 2.0;
     let hex_height = sz * sqrt3;
     
-    // Преобразуем координаты в систему шестиугольной сетки
     let q = (2.0/3.0 * x) / sz;
     let r = (-1.0/3.0 * x + sqrt3/3.0 * y) / sz;
     let s = -q - r;  // cubic coordinates: q + r + s = 0
     
-    // Округляем до ближайшего шестиугольника
     let q_round = q.round();
     let r_round = r.round();
     let s_round = s.round();
@@ -33,7 +30,6 @@ fn hex_lattice_centers(x: f64, y: f64, sz: f64) -> (f64, f64) {
     let r_diff = (r_round - r).abs();
     let s_diff = (s_round - s).abs();
     
-    // Корректируем округление
     let (q_final, r_final) = if q_diff > r_diff && q_diff > s_diff {
         (-r_round - s_round, r_round)
     } else if r_diff > s_diff {
@@ -42,7 +38,6 @@ fn hex_lattice_centers(x: f64, y: f64, sz: f64) -> (f64, f64) {
         (q_round, r_round)
     };
     
-    // Преобразуем обратно в декартовы координаты
     let center_x = sz * 3.0/2.0 * q_final;
     let center_y = sz * sqrt3 * (r_final + q_final/2.0);
     
@@ -67,7 +62,6 @@ fn osc2(a: f64, n: usize) -> f64 {
 fn main() {
   let args: Vec<String> = env::args().collect();
     
-    // Парсим аргументы командной строки
     let base = if args.len() > 1 {
         args[1].parse::<f64>().unwrap()
     } else {
